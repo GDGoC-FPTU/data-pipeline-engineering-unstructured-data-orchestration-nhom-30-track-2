@@ -1,6 +1,6 @@
 import os
 import json
-import glob
+from glob import glob
 
 # Import các thành phần
 from schema import UnifiedDocument
@@ -11,37 +11,43 @@ from quality_check import run_semantic_checks
 # ROLE 4: DEVOPS & INTEGRATION SPECIALIST
 # ==========================================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-RAW_DATA_DIR = os.path.join(BASE_DIR, "..", "raw_data")
-OUTPUT_FILE = os.path.join(BASE_DIR, "..", "processed_knowledge_base.json")
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_FOLDER = os.path.join(CURRENT_DIR, "..", "raw_data")
+DESTINATION_FILE = os.path.join(CURRENT_DIR, "..", "processed_knowledge_base.json")
 
-def run_pipeline():
-    final_kb = []
+def read_json_file(filepath):
+    """Đọc file JSON và trả về dict"""
+    with open(filepath, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def execute_pipeline():
+    knowledge_base = []
     
-    # Xử lý Group A (PDFs)
-    pdf_files = glob.glob(os.path.join(RAW_DATA_DIR, "group_a_pdfs", "*.json"))
-    for file_path in pdf_files:
-        with open(file_path, 'r') as f:
-            raw_data = json.load(f)
+    # 1. Ingest Group A (PDF files)
+    pdf_pattern = os.path.join(DATA_FOLDER, "group_a_pdfs", "*.json")
+    for file_path in glob(pdf_pattern):
+        raw_data = read_json_file(file_path)
+        cleaned_doc = process_pdf_data(raw_data)
         
-        processed_doc = process_pdf_data(raw_data)
-        if run_semantic_checks(processed_doc):
-            final_kb.append(UnifiedDocument(**processed_doc).model_dump())
+        if run_semantic_checks(cleaned_doc):
+            validated_doc = UnifiedDocument(**cleaned_doc)
+            knowledge_base.append(validated_doc.model_dump())
 
-    # Xử lý Group B (Videos)
-    video_files = glob.glob(os.path.join(RAW_DATA_DIR, "group_b_videos", "*.json"))
-    for file_path in video_files:
-        with open(file_path, 'r') as f:
-            raw_data = json.load(f)
+    # 2. Ingest Group B (Video files)
+    video_pattern = os.path.join(DATA_FOLDER, "group_b_videos", "*.json")
+    for file_path in glob(video_pattern):
+        raw_data = read_json_file(file_path)
+        cleaned_doc = process_video_data(raw_data)
         
-        processed_doc = process_video_data(raw_data)
-        if run_semantic_checks(processed_doc):
-            final_kb.append(UnifiedDocument(**processed_doc).model_dump())
+        if run_semantic_checks(cleaned_doc):
+            validated_doc = UnifiedDocument(**cleaned_doc)
+            knowledge_base.append(validated_doc.model_dump())
 
-    # Lưu kết quả
-    with open(OUTPUT_FILE, 'w') as f:
-        json.dump(final_kb, f, indent=4)
-        print(f"Pipeline finished! Saved {len(final_kb)} records.")
+    # 3. Export Data
+    with open(DESTINATION_FILE, 'w', encoding='utf-8') as f:
+        json.dump(knowledge_base, f, indent=2, ensure_ascii=False)
+        
+    print(f"✅ Pipeline executed successfully! Total valid records saved: {len(knowledge_base)}")
 
 if __name__ == "__main__":
-    run_pipeline()
+    execute_pipeline()
